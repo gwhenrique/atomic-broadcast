@@ -1,9 +1,10 @@
 package main
 
 import (
-	CBTOB "./CBTOBroadcast"
+	"fmt"
+	"strconv"
 )
 
 func main() {
-	var aa = CBTOB.CBTOBroadcast{}
+	fmt.Println("Memes" + strconv.Itoa(1))
 }
