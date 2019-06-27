@@ -107,7 +107,7 @@ func RB2BEB(message ReliableBroadcast_Req_Message) BEB.BestEffortBroadcast_Req_M
 func BEB2RB(message BEB.BestEffortBroadcast_Ind_Message) ReliableBroadcast_Ind_Message {
 
 	parts := strings.Split(message.Message, ";")
-	content := strings.Join(parts[1:], "")
+	content := strings.Join(parts[1:], ";")
 	sender := parts[0]
 
 	return ReliableBroadcast_Ind_Message{
