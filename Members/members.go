@@ -11,19 +11,19 @@ type Member struct {
 	Name    int
 }
 
-var self *Member;
-var l = list.New();
+var self *Member
+var l = list.New()
 
 func SetSelf(name int) {
-	self = Find(name);
+	self = Find(name)
 }
 
 func GetSelf() *Member {
-	return self;
+	return self
 }
 
 func Add(memb Member) {
-	l.PushFront(memb);
+	l.PushFront(memb)
 }
 
 func Count() int {
@@ -32,27 +32,29 @@ func Count() int {
 
 func Find_Random() *Member {
 
-	var num = rand.Intn(l.Len());
+	var num = rand.Intn(l.Len())
 
 	for e := l.Front(); true; e = e.Next() {
-		if (num == 0) {
-			var item= e.Value.(Member);
-			return &item;
+		if num == 0 {
+			var item = e.Value.(Member)
+			return &item
 		}
-		num--;
+		num--
 	}
 
-	return nil;
+	return nil
 }
 
 func Find(name int) *Member {
 	for e := l.Front(); e != nil; e = e.Next() {
-		var item = e.Value.(Member);
-		if (item.Name == name) { return &item; }
+		var item = e.Value.(Member)
+		if item.Name == name {
+			return &item
+		}
 	}
 
-	fmt.Print("Search for ", string(name), " failed!");
-	return nil;
+	fmt.Print("Search for ", string(name), " failed!")
+	return nil
 }
 
 func ForEach(fun func(member *Member)) {
