@@ -11,6 +11,7 @@ package CBTOBroadcast
 
 import (
 	"container/list"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -26,7 +27,7 @@ type Ind_CBTOB_Message struct {
 }
 
 type Req_CBTOB_Message struct {
-	procSender string
+	ProcSender string
 	To         []string
 	MessageId  int
 	Message    string
@@ -37,7 +38,7 @@ type Req_CBTOB_Message struct {
 func CBTOBReqToRB(message Req_CBTOB_Message) RB.ReliableBroadcast_Req_Message {
 
 	RBMessage := RB.ReliableBroadcast_Req_Message{
-		Sender:    message.procSender,
+		Sender:    message.ProcSender,
 		Addresses: message.To,
 		Message:   "nothing;" + strconv.Itoa(message.MessageId) + ";" + message.Message, //adicionar messageID aqui
 	}
@@ -46,14 +47,14 @@ func CBTOBReqToRB(message Req_CBTOB_Message) RB.ReliableBroadcast_Req_Message {
 
 func RBIndToCBTOB(message RB.ReliableBroadcast_Ind_Message) Ind_CBTOB_Message {
 	parts := strings.Split(message.Message, ";")
-	content := strings.Join(parts[1:], "")
+	content := strings.Join(parts[2:], "")
 	messageType := parts[0] //Decide ou whatever
-	messageId, _ := strconv.Atoi(parts[1])
+	messageID, _ := strconv.Atoi(parts[1])
 
 	CBTOBMessage := Ind_CBTOB_Message{
 		ProcSender:  message.Sender,
 		Message:     content,
-		MessageId:   messageId,
+		MessageId:   messageID,
 		MessageType: messageType,
 	}
 
@@ -68,27 +69,30 @@ type CBTOBroadcast struct {
 	// hierarchicalConsensus *FakeConsensus
 	unordered *list.List
 	delivered *list.List
-	rb        *RB.ReliableBroadcast_Module
+	rb        RB.ReliableBroadcast_Module
 	Addresses []string
 	Address   string
 	round     int
 	rank      int
-	wait      boolmessage
+	wait      bool
 }
 
 func Init(address string, addresses []string, processRank int) *CBTOBroadcast {
 
 	var module *CBTOBroadcast
-
+	module = &CBTOBroadcast{}
 	module.Ind = make(chan Ind_CBTOB_Message)
 	module.Req = make(chan Req_CBTOB_Message)
-	module.rb = &RB.ReliableBroadcast_Module{
+	module.rb = RB.ReliableBroadcast_Module{
 		Self:      address,
 		Addresses: addresses,
+		Req:       make(chan RB.ReliableBroadcast_Req_Message),
+		Ind:       make(chan RB.ReliableBroadcast_Ind_Message),
+		Delivered: make(map[string]bool),
 	}
-
 	module.rb.Init()
 	module.Address = address
+	module.Addresses = addresses
 	module.unordered = list.New()
 	module.delivered = list.New()
 
@@ -99,7 +103,7 @@ func Init(address string, addresses []string, processRank int) *CBTOBroadcast {
 	// module.hierarchicalConsensus = HierarchicalConsensus.NewMultiHierarchicalConsensus() //importar corretamente deopis
 
 	module.Start()
-
+	fmt.Println("CBTOB Init!")
 	return module
 
 }
@@ -125,36 +129,43 @@ func (module *CBTOBroadcast) Start() {
 }
 
 func (module *CBTOBroadcast) CheckMessage(message RB.ReliableBroadcast_Ind_Message) {
+	fmt.Println("CheckMessage: got message")
 	parts := strings.Split(message.Message, ";")
 	content := strings.Join(parts[1:], ";")
 	messageType := parts[0]
 
 	if messageType == "Decide" {
+		fmt.Println("CBTOB: Got decision message")
 		module.SortMessages(content)
 	} else {
+		fmt.Println("CBTOB: got some message")
 		module.AddUndeliveredMessage(message)
 	}
 
 }
 
 func (module *CBTOBroadcast) Broadcast(message Req_CBTOB_Message) {
+	fmt.Println("Got a message")
 	rbMessage := CBTOBReqToRB(message)
 	module.rb.Req <- rbMessage
+	fmt.Println("CBTOB: enviei pro RB")
 }
 
 func (module *CBTOBroadcast) AddUndeliveredMessage(message RB.ReliableBroadcast_Ind_Message) {
 	CBTOBMessage := RBIndToCBTOB(message)
 	module.unordered.PushBack(CBTOBMessage)
+	fmt.Println("CBTOB: undordered message added")
 }
 
 //rever tudo isso aqui, tá horroroso
 func (module *CBTOBroadcast) SortMessages(message string) {
 	// if module.r == message.round {
 	// decidedMessages := ConsensusToDecidedOrder(message)
-
+	fmt.Println("CBTOB: sorting: " + message)
 	parts := strings.Split(message, ";")
 	tmpList := list.New()
-	for i := 0; i < len(parts); i += 2 {
+	fmt.Println("CBTOB: parts length: " + strconv.Itoa(len(parts)))
+	for i := 0; i < len(parts)-1; i += 2 {
 		for e := module.unordered.Front(); e != nil; e = e.Next() {
 			currMsg := e.Value.(Ind_CBTOB_Message)
 			msgID, _ := strconv.Atoi(parts[i+1])
@@ -177,12 +188,16 @@ func (module *CBTOBroadcast) SortMessages(message string) {
 }
 
 func (module *CBTOBroadcast) TryNewConsensus() {
+	fmt.Println("CBTOB: Trying to create consensus")
 	if module.unordered.Front() != nil && !module.wait {
 		module.wait = true
-
+		fmt.Println("CBTOB: creating consensus")
 		// consensusInstance := module.hierarchicalConsensus.CreateInstance()
 		// consensusInstance.Proposal <- MessageOrder()
 		if module.rank == 0 {
+			fmt.Println("CBTOB: sent decision to RB")
+			decision := module.DecisionToRB()
+			fmt.Println("CBTOB: decision message: " + decision.Message)
 			module.rb.Req <- module.DecisionToRB()
 		}
 
@@ -216,6 +231,11 @@ func (module *CBTOBroadcast) DecisionToRB() RB.ReliableBroadcast_Req_Message {
 		Message:   "Decide;" + decidedMessageOrder,
 		Sender:    module.Address,
 	}
-
+	fmt.Println("CBTOB: created decision message :::: " + RBMessage.Message)
+	a := ""
+	for i := 0; i < len(module.Addresses); i++ {
+		a += module.Addresses[i]
+	}
+	fmt.Println(a)
 	return RBMessage
 }

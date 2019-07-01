@@ -64,7 +64,7 @@ func (module ReliableBroadcast_Module) Start() {
 }
 
 func (module ReliableBroadcast_Module) Broadcast(message ReliableBroadcast_Req_Message) {
-
+	fmt.Println("RB: got message: " + message.Message)
 	module.BestEffortBroadcast.Req <- RB2BEB(message)
 
 }
@@ -84,7 +84,7 @@ func (module ReliableBroadcast_Module) Deliver(message ReliableBroadcast_Ind_Mes
 	module.Ind <- message
 
 	module.BestEffortBroadcast.Req <- RB2BEB(message.Retransmit(module))
-
+	fmt.Println("Delivered to CBTOB")
 }
 
 func (message ReliableBroadcast_Ind_Message) Retransmit(module ReliableBroadcast_Module) ReliableBroadcast_Req_Message {

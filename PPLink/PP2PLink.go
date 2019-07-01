@@ -84,6 +84,7 @@ func (module PP2PLink) Start(address string) {
 	go func() {
 		for {
 			message := <-module.Req
+			fmt.Println("PP2P: got message: " + message.Message)
 			module.Send(message)
 		}
 	}()
@@ -95,10 +96,9 @@ func (module PP2PLink) Send(message PP2PLink_Req_Message) {
 	var conn net.Conn
 	var ok bool
 	var err error
-
 	// ja existe uma conexao aberta para aquele destinatario?
 	if conn, ok = module.Cache[message.To]; ok {
-		//fmt.Printf("Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
+		fmt.Printf("PP2P: Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
 	} else { // se nao tiver, abre e guarda na cache
 		conn, err = net.Dial("tcp", message.To)
 		if err != nil {

@@ -57,12 +57,12 @@ func (module BestEffortBroadcast_Module) Start() {
 }
 
 func (module BestEffortBroadcast_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
-
+	fmt.Println("BEB: got message: " + message.Message)
 	for i := 0; i < len(message.Addresses); i++ {
 		msg := BEB2PP2PLink(message)
 		msg.To = message.Addresses[i]
 		module.Pp2plink.Req <- msg
-		fmt.Println("Sent to " + message.Addresses[i])
+		fmt.Println("BEB: Sent to " + message.Addresses[i])
 	}
 
 }
