@@ -30,14 +30,17 @@ type BestEffortBroadcast_Module struct {
 	Pp2plink PP2PLink.PP2PLink
 }
 
+var add string
+
 func (module BestEffortBroadcast_Module) Init(address string) {
 
 	fmt.Println("Init BEB!")
 	module.Pp2plink = PP2PLink.PP2PLink{
 		Req: make(chan PP2PLink.PP2PLink_Req_Message),
-		Ind: make(chan PP2PLink.PP2PLink_Ind_Message)}
+		Ind: make(chan PP2PLink.PP2PLink_Ind_Message, 1)}
 	module.Pp2plink.Init(address)
 	module.Start()
+	add = address
 
 }
 
@@ -56,22 +59,24 @@ func (module BestEffortBroadcast_Module) Start() {
 
 }
 
+
+
 func (module BestEffortBroadcast_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
-	fmt.Println("BEB: got message: " + message.Message)
+	fmt.Println(add + " --- BEB: got message: " + message.Message)
 	for i := 0; i < len(message.Addresses); i++ {
 		msg := BEB2PP2PLink(message)
 		msg.To = message.Addresses[i]
 		module.Pp2plink.Req <- msg
-		fmt.Println("BEB: Sent to " + message.Addresses[i])
+		fmt.Println(add + " --- BEB: Sent to " + message.Addresses[i])
 	}
 
 }
 
 func (module BestEffortBroadcast_Module) Deliver(message BestEffortBroadcast_Ind_Message) {
 
-	fmt.Println("BEB: Deliver: Received '" + message.Message + "' from " + message.From)
+	fmt.Println(add + " --- BEB: Deliver: Received '" + message.Message + "' from " + message.From)
 	module.Ind <- message
-	fmt.Println("# End BEB Received")
+	fmt.Println(add + " --- # End BEB Received")
 
 }
 

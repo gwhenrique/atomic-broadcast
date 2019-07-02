@@ -43,8 +43,8 @@ func (module ReliableBroadcast_Module) Init() {
 
 	fmt.Println("Init RB!")
 	module.BestEffortBroadcast = BEB.BestEffortBroadcast_Module{
-		Req: make(chan BEB.BestEffortBroadcast_Req_Message),
-		Ind: make(chan BEB.BestEffortBroadcast_Ind_Message)}
+		Req: make(chan BEB.BestEffortBroadcast_Req_Message, 1),
+		Ind: make(chan BEB.BestEffortBroadcast_Ind_Message,1 )}
 	module.BestEffortBroadcast.Init(module.Self)
 	module.Start()
 
@@ -80,19 +80,19 @@ func (module ReliableBroadcast_Module) Start() {
 }
 
 func (module ReliableBroadcast_Module) Broadcast(message ReliableBroadcast_Req_Message) {
-	fmt.Println("RB: got message: " + message.Message)
+	fmt.Println(module.Self + " --- RB: got message: " + message.Message)
 	module.BestEffortBroadcast.Req <- RB2BEB(message)
-
+	fmt.Println(module.Self + " --- RB: delivered message " + message.Message + " to BEB")
 }
 
 func (module ReliableBroadcast_Module) Deliver(message ReliableBroadcast_Ind_Message) {
 
 	key := message.Sender + ";" + message.Message
-	fmt.Println("RB: Deliver: Received: " + message.Message + " originally by " + message.Sender + " from " + message.From)
+	fmt.Println(module.Self + " --- RB: Deliver: Received: " + message.Message + " originally by " + message.Sender + " from " + message.From)
 
 	_, found := module.Delivered[key]
 	if found {
-		fmt.Println("Message Already Received!")
+		fmt.Println(module.Self + " --- Message Already Received!")
 		return
 	}
 
@@ -100,7 +100,7 @@ func (module ReliableBroadcast_Module) Deliver(message ReliableBroadcast_Ind_Mes
 	module.Ind <- message
 
 	module.BestEffortBroadcast.Req <- RB2BEB(message.Retransmit(module))
-	fmt.Println("Delivered to CBTOB")
+	fmt.Println(module.Self + " --- RB: Delivered to CBTOB")
 }
 
 func (message ReliableBroadcast_Ind_Message) Retransmit(module ReliableBroadcast_Module) ReliableBroadcast_Req_Message {

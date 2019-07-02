@@ -35,8 +35,10 @@ type PP2PLink struct {
 	Cache map[string]net.Conn
 }
 
-func (module PP2PLink) Init(address string) {
+var add string
 
+func (module PP2PLink) Init(address string) {
+	add = address
 	fmt.Println("Init PP2PLink!")
 	if module.Run {
 		return
@@ -74,6 +76,8 @@ func (module PP2PLink) Start(address string) {
 					msg := PP2PLink_Ind_Message{
 						From:    conn.RemoteAddr().String(),
 						Message: string(content)}
+					
+					fmt.Println(add + " --- PP2P: sending message to BEB: " + msg.Message)
 
 					module.Ind <- msg
 				}
@@ -84,7 +88,7 @@ func (module PP2PLink) Start(address string) {
 	go func() {
 		for {
 			message := <-module.Req
-			fmt.Println("PP2P: got message: " + message.Message)
+			fmt.Println(add + " --- PP2P: got message: " + message.Message)
 			module.Send(message)
 		}
 	}()
@@ -98,7 +102,7 @@ func (module PP2PLink) Send(message PP2PLink_Req_Message) {
 	var err error
 	// ja existe uma conexao aberta para aquele destinatario?
 	if conn, ok = module.Cache[message.To]; ok {
-		fmt.Printf("PP2P: Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
+		fmt.Printf(add + " --- PP2P: Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
 	} else { // se nao tiver, abre e guarda na cache
 		conn, err = net.Dial("tcp", message.To)
 		if err != nil {

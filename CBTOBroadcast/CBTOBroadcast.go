@@ -9,6 +9,23 @@ package CBTOBroadcast
 //arrumar nomes de variáveis - procsender = from?
 //aaaaaaaa
 
+
+// 127.0.0.1:7000 --- BEB: Deliver: Received '' from 127.0.0.1:53486
+// panic: runtime error: slice bounds out of range
+
+// goroutine 10 [running]:
+// _/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast.RBIndToCBTOB(0xc000124090, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, ...)
+// 	/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast/CBTOBroadcast.go:69 +0x2a5
+// _/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast.(*CBTOBroadcast).AddUndeliveredMessage(0xc000084680, 0xc000124090, 0xf, 0x0, 0x0, 0x0, 0x0)
+// 	/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast/CBTOBroadcast.go:161 +0x5a
+// _/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast.(*CBTOBroadcast).CheckMessage(0xc000084680, 0xc000124090, 0xf, 0x0, 0x0, 0x0, 0x0)
+// 	/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast/CBTOBroadcast.go:148 +0x217
+// _/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast.(*CBTOBroadcast).Start.func1(0xc000084680)
+// 	/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast/CBTOBroadcast.go:122 +0x177
+// created by _/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast.(*CBTOBroadcast).Start
+// 	/home/15110525/Desktop/atomic-broadcast/CBTOBroadcast/CBTOBroadcast.go:116 +0x3f
+// exit status 2
+
 import (
 	"container/list"
 	"fmt"
@@ -57,6 +74,9 @@ func CBTOBReqToRB(message Req_CBTOB_Message) RB.ReliableBroadcast_Req_Message {
 		Addresses: message.To,
 		Message:   "nothing;" + strconv.Itoa(message.MessageId) + ";" + message.Message, //adicionar messageID aqui
 	}
+
+	fmt.Println("Mensagem criada para o RB: " + RBMessage.Sender)
+
 	return RBMessage
 }
 
@@ -82,7 +102,7 @@ func Init(address string, addresses []string, processRank int) *CBTOBroadcast {
 
 	var module *CBTOBroadcast
 	module = &CBTOBroadcast{}
-	module.Ind = make(chan Ind_CBTOB_Message)
+	module.Ind = make(chan Ind_CBTOB_Message, 100)
 	module.Req = make(chan Req_CBTOB_Message)
 	module.rb = RB.ReliableBroadcast_Module{
 		Self:      address,
@@ -130,10 +150,12 @@ func (module *CBTOBroadcast) Start() {
 }
 
 func (module *CBTOBroadcast) CheckMessage(message RB.ReliableBroadcast_Ind_Message) {
-	fmt.Println("CheckMessage: got message")
+	fmt.Println("CBTOB: CheckMessage: got message: " + message.Message)
 	parts := strings.Split(message.Message, ";")
 	content := strings.Join(parts[1:], ";")
 	messageType := parts[0]
+
+	//adicionar cabeçalho para diferenciar entre consenso e atomic broadcast
 
 	if messageType == "Decide" {
 		fmt.Println("CBTOB: Got decision message")
@@ -159,6 +181,7 @@ func (module *CBTOBroadcast) AddUndeliveredMessage(message RB.ReliableBroadcast_
 }
 
 //rever tudo isso aqui, tá horroroso
+//método não remove mensagens do conjunto de não ordenadas
 func (module *CBTOBroadcast) SortMessages(message string) {
 	// if module.r == message.round {
 	// decidedMessages := ConsensusToDecidedOrder(message)
@@ -171,6 +194,7 @@ func (module *CBTOBroadcast) SortMessages(message string) {
 			currMsg := e.Value.(Ind_CBTOB_Message)
 			msgID, _ := strconv.Atoi(parts[i+1])
 			if (currMsg.ProcSender == parts[i]) && (currMsg.MessageId == msgID) {
+				fmt.Println("CBTOB: SortMessages: encontrei mensagem igual: "+ parts[i])
 				module.Ind <- currMsg
 				module.delivered.PushBack(currMsg)
 				tmpList.PushBack(currMsg)
@@ -180,7 +204,14 @@ func (module *CBTOBroadcast) SortMessages(message string) {
 	}
 	// module.delivered.PushBackList(decidedMessages)
 	for e := tmpList.Front(); e != nil; e = e.Next() {
-		module.unordered.Remove(e)
+		msg := e.Value.(Ind_CBTOB_Message)
+		for m := module.unordered.Front(); m != nil; m = m.Next(){
+			b := m.Value.(Ind_CBTOB_Message)
+			if(msg.ProcSender == b.ProcSender) && (msg.MessageId == b.MessageId){
+				module.unordered.Remove(m)
+
+			}
+		}
 	}
 
 	fmt.Println("CBTOB: SortMessages: size of unordered after sorting: " + strconv.Itoa(module.unordered.Len()))
@@ -194,10 +225,10 @@ func (module *CBTOBroadcast) TryNewConsensus() {
 	fmt.Println("CBTOB: Trying to create consensus")
 	if module.unordered.Front() != nil && !module.wait {
 		module.wait = true
-		fmt.Println("CBTOB: creating consensus")
 		// consensusInstance := module.hierarchicalConsensus.CreateInstance()
 		// consensusInstance.Proposal <- MessageOrder()
 		if module.rank == 0 {
+			fmt.Println("CBTOB: creating consensus")
 			fmt.Println("CBTOB: sent decision to RB")
 			decision := module.DecisionToRB()
 			fmt.Println("CBTOB: decision message: " + decision.Message)
@@ -234,7 +265,7 @@ func (module *CBTOBroadcast) DecisionToRB() RB.ReliableBroadcast_Req_Message {
 		Message:   "Decide;" + decidedMessageOrder,
 		Sender:    module.Address,
 	}
-	// fmt.Println("CBTOB: created decision message :::: " + RBMessage.Message)
+	fmt.Println("CBTOB: created decision message :::: " + RBMessage.Message)
 	// a := ""
 	// for i := 0; i < len(module.Addresses); i++ {
 	// 	a += module.Addresses[i]
