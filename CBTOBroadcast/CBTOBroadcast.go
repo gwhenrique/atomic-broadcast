@@ -33,34 +33,6 @@ type Req_CBTOB_Message struct {
 	Message    string
 }
 
-//list: id e proc de cada mensagem
-
-func CBTOBReqToRB(message Req_CBTOB_Message) RB.ReliableBroadcast_Req_Message {
-
-	RBMessage := RB.ReliableBroadcast_Req_Message{
-		Sender:    message.ProcSender,
-		Addresses: message.To,
-		Message:   "nothing;" + strconv.Itoa(message.MessageId) + ";" + message.Message, //adicionar messageID aqui
-	}
-	return RBMessage
-}
-
-func RBIndToCBTOB(message RB.ReliableBroadcast_Ind_Message) Ind_CBTOB_Message {
-	parts := strings.Split(message.Message, ";")
-	content := strings.Join(parts[2:], "")
-	messageType := parts[0] //Decide ou whatever
-	messageID, _ := strconv.Atoi(parts[1])
-
-	CBTOBMessage := Ind_CBTOB_Message{
-		ProcSender:  message.Sender,
-		Message:     content,
-		MessageId:   messageID,
-		MessageType: messageType,
-	}
-
-	return CBTOBMessage
-}
-
 type CBTOBroadcast struct {
 	// Ind                   chan HierarchicalConsensus.Message
 	// Red                   chan HierarchicalConsensus.Message
@@ -75,6 +47,35 @@ type CBTOBroadcast struct {
 	round     int
 	rank      int
 	wait      bool
+}
+
+//CBTOBReqToRB: Conversão de pedido da aplicação para envio por reliable broadcast
+func CBTOBReqToRB(message Req_CBTOB_Message) RB.ReliableBroadcast_Req_Message {
+
+	RBMessage := RB.ReliableBroadcast_Req_Message{
+		Sender:    message.ProcSender,
+		Addresses: message.To,
+		Message:   "nothing;" + strconv.Itoa(message.MessageId) + ";" + message.Message, //adicionar messageID aqui
+	}
+	return RBMessage
+}
+
+//RBIndToCBTOB: Indicação do reliable broadcast para mensagem para a aplicação
+func RBIndToCBTOB(message RB.ReliableBroadcast_Ind_Message) Ind_CBTOB_Message {
+	parts := strings.Split(message.Message, ";")
+	content := strings.Join(parts[2:], "")
+	messageType := parts[0] //Decide ou whatever
+	messageID, _ := strconv.Atoi(parts[1])
+	fmt.Println("CBTOB: RBIndToCBTOB: content is: " + content)
+
+	CBTOBMessage := Ind_CBTOB_Message{
+		ProcSender:  message.Sender,
+		Message:     content,
+		MessageId:   messageID,
+		MessageType: messageType,
+	}
+
+	return CBTOBMessage
 }
 
 func Init(address string, addresses []string, processRank int) *CBTOBroadcast {
@@ -138,14 +139,14 @@ func (module *CBTOBroadcast) CheckMessage(message RB.ReliableBroadcast_Ind_Messa
 		fmt.Println("CBTOB: Got decision message")
 		module.SortMessages(content)
 	} else {
-		fmt.Println("CBTOB: got some message")
+		fmt.Println("CBTOB: got some message, adding to undelivered")
 		module.AddUndeliveredMessage(message)
 	}
 
 }
 
 func (module *CBTOBroadcast) Broadcast(message Req_CBTOB_Message) {
-	fmt.Println("Got a message")
+	fmt.Println("CBTOB: Broadcasting " + message.Message)
 	rbMessage := CBTOBReqToRB(message)
 	module.rb.Req <- rbMessage
 	fmt.Println("CBTOB: enviei pro RB")
@@ -181,6 +182,8 @@ func (module *CBTOBroadcast) SortMessages(message string) {
 	for e := tmpList.Front(); e != nil; e = e.Next() {
 		module.unordered.Remove(e)
 	}
+
+	fmt.Println("CBTOB: SortMessages: size of unordered after sorting: " + strconv.Itoa(module.unordered.Len()))
 
 	module.round++
 	module.wait = false
@@ -231,11 +234,11 @@ func (module *CBTOBroadcast) DecisionToRB() RB.ReliableBroadcast_Req_Message {
 		Message:   "Decide;" + decidedMessageOrder,
 		Sender:    module.Address,
 	}
-	fmt.Println("CBTOB: created decision message :::: " + RBMessage.Message)
-	a := ""
-	for i := 0; i < len(module.Addresses); i++ {
-		a += module.Addresses[i]
-	}
-	fmt.Println(a)
+	// fmt.Println("CBTOB: created decision message :::: " + RBMessage.Message)
+	// a := ""
+	// for i := 0; i < len(module.Addresses); i++ {
+	// 	a += module.Addresses[i]
+	// }
+	// fmt.Println(a)
 	return RBMessage
 }

@@ -50,15 +50,31 @@ func (module ReliableBroadcast_Module) Init() {
 
 }
 
+// func (module ReliableBroadcast_Module) Start() {
+// 	go func() {
+// 		for {
+// 			select {
+// 			case y := <-module.Req:
+// 				module.Broadcast(y)
+// 			case y := <-module.BestEffortBroadcast.Ind:
+// 				module.Deliver(BEB2RB(y))
+// 			}
+// 		}
+// 	}()
+// }
+
 func (module ReliableBroadcast_Module) Start() {
 	go func() {
 		for {
-			select {
-			case y := <-module.Req:
-				module.Broadcast(y)
-			case y := <-module.BestEffortBroadcast.Ind:
-				module.Deliver(BEB2RB(y))
-			}
+			y := <-module.Req
+			module.Broadcast(y)
+		}
+	}()
+
+	go func() {
+		for {
+			y := <-module.BestEffortBroadcast.Ind
+			module.Deliver(BEB2RB(y))
 		}
 	}()
 }
@@ -72,7 +88,7 @@ func (module ReliableBroadcast_Module) Broadcast(message ReliableBroadcast_Req_M
 func (module ReliableBroadcast_Module) Deliver(message ReliableBroadcast_Ind_Message) {
 
 	key := message.Sender + ";" + message.Message
-	fmt.Println("Received: " + message.Message + " originally by " + message.Sender + " from " + message.From)
+	fmt.Println("RB: Deliver: Received: " + message.Message + " originally by " + message.Sender + " from " + message.From)
 
 	_, found := module.Delivered[key]
 	if found {
