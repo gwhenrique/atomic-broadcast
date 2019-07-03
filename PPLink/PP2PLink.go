@@ -15,8 +15,11 @@
 
 package PP2PLink
 
-import "fmt"
-import "net"
+import (
+	"fmt"
+	"net"
+	"strings"
+)
 
 type PP2PLink_Req_Message struct {
 	To      string
@@ -49,6 +52,52 @@ func (module PP2PLink) Init(address string) {
 	module.Start(address)
 }
 
+// func (module PP2PLink) Start(address string) {
+
+// 	go func() {
+
+// 		listen, _ := net.Listen("tcp4", address)
+// 		for {
+
+// 			// aceita repetidamente tentativas novas de conexao
+// 			conn, err := listen.Accept()
+
+// 			go func() {
+
+// 				// quando aceita, repetidamente recebe mensagens na conexao TCP (sem fechar)
+// 				// e passa para cima
+// 				for {
+// 					buf := make([]byte, 1024)
+// 					if err != nil {
+// 						continue
+// 					}
+// 					len, _ := conn.Read(buf)
+
+// 					content := make([]byte, len)
+// 					copy(content, buf)
+
+// 					msg := PP2PLink_Ind_Message{
+// 						From:    conn.RemoteAddr().String(),
+// 						Message: string(content)}
+
+// 					fmt.Println(add + " --- PP2P: sending message to BEB: " + msg.Message)
+
+// 					module.Ind <- msg
+// 				}
+// 			}()
+// 		}
+// 	}()
+
+// 	go func() {
+// 		for {
+// 			message := <-module.Req
+// 			fmt.Println(add + " --- PP2P: got message: " + message.Message)
+// 			module.Send(message)
+// 		}
+// 	}()
+
+// }
+
 func (module PP2PLink) Start(address string) {
 
 	go func() {
@@ -68,18 +117,25 @@ func (module PP2PLink) Start(address string) {
 					if err != nil {
 						continue
 					}
-					len, _ := conn.Read(buf)
+					length, _ := conn.Read(buf)
 
-					content := make([]byte, len)
+					content := make([]byte, length)
 					copy(content, buf)
+					strMsg := string(content)
 
-					msg := PP2PLink_Ind_Message{
-						From:    conn.RemoteAddr().String(),
-						Message: string(content)}
-					
-					fmt.Println(add + " --- PP2P: sending message to BEB: " + msg.Message)
+					differentMsgs := strings.Split(strMsg, "///")
+					differentMsgs = differentMsgs[:len(differentMsgs)-1]
 
-					module.Ind <- msg
+					for _, msg := range differentMsgs {
+						msg2BEB := PP2PLink_Ind_Message{
+							From:    conn.RemoteAddr().String(),
+							Message: msg}
+
+						// fmt.Println(add + " --- PP2P: sending message to BEB: " + msg2BEB.Message)
+
+						module.Ind <- msg2BEB
+					}
+
 				}
 			}()
 		}
@@ -88,12 +144,32 @@ func (module PP2PLink) Start(address string) {
 	go func() {
 		for {
 			message := <-module.Req
-			fmt.Println(add + " --- PP2P: got message: " + message.Message)
+			// fmt.Println(add + " --- PP2P: got message: " + message.Message)
 			module.Send(message)
 		}
 	}()
 
 }
+
+// func (module PP2PLink) Send(message PP2PLink_Req_Message) {
+
+// 	var conn net.Conn
+// 	var ok bool
+// 	var err error
+// 	// ja existe uma conexao aberta para aquele destinatario?
+// 	if conn, ok = module.Cache[message.To]; ok {
+// 		fmt.Printf(add+" --- PP2P: Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
+// 	} else { // se nao tiver, abre e guarda na cache
+// 		conn, err = net.Dial("tcp", message.To)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		}
+// 		module.Cache[message.To] = conn
+// 	}
+
+// 	fmt.Fprintf(conn, message.Message)
+// }
 
 func (module PP2PLink) Send(message PP2PLink_Req_Message) {
 
@@ -102,7 +178,7 @@ func (module PP2PLink) Send(message PP2PLink_Req_Message) {
 	var err error
 	// ja existe uma conexao aberta para aquele destinatario?
 	if conn, ok = module.Cache[message.To]; ok {
-		fmt.Printf(add + " --- PP2P: Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
+		// fmt.Printf(add+" --- PP2P: Reusing connection %v to %v\n", conn.LocalAddr(), message.To)
 	} else { // se nao tiver, abre e guarda na cache
 		conn, err = net.Dial("tcp", message.To)
 		if err != nil {
@@ -112,5 +188,5 @@ func (module PP2PLink) Send(message PP2PLink_Req_Message) {
 		module.Cache[message.To] = conn
 	}
 
-	fmt.Fprintf(conn, message.Message)
+	fmt.Fprintf(conn, message.Message+"///")
 }

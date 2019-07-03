@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"time"
 	"os"
 	"strconv"
+	"time"
 
 	CBTOB "./CBTOBroadcast"
 )
@@ -35,38 +36,57 @@ func main() {
 }
 */
 
-func main() {
+func ParseAddresses(address_file string) []string {
+	var addresses []string
 
-	if (len(os.Args) < 2) {
-		fmt.Println("Please specify at least one address:port!")
-		return
+	file, _ := os.Open(address_file)
+
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		addresses = append(addresses, scanner.Text())
 	}
 
+	return addresses
+
+}
+
+func main() {
+
 	myRank, _ := strconv.Atoi(os.Args[1])
-	message := os.Args[2]
 
+	// var array [2]string
 
-
-	var array [2]string
+	addresses := ParseAddresses(os.Args[2])
 
 	bla := make(chan int)
 
-	array[0] = "127.0.0.1:6000"
-	array[1] = "127.0.0.1:7000"
-	cbto := CBTOB.Init(array[myRank], array[:], myRank)
-	ReqMessage := CBTOB.Req_CBTOB_Message{
-		ProcSender: array[myRank],
-		To:         array[:],
-		MessageId:  1,
-		Message:    message,
-	}
+	// array[0] = "127.0.0.1:6000"
+	// array[1] = "127.0.0.1:7000"
+	cbto := CBTOB.Init(addresses[myRank], addresses, myRank)
 
 	time.Sleep(2 * time.Second)
-
+	currID := 1
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			message, _ := reader.ReadString('\n')
+			message = message[:len(message)-1]
+			ReqMessage := CBTOB.Req_CBTOB_Message{
+				ProcSender: addresses[myRank],
+				To:         addresses[:],
+				MessageId:  currID,
+				Message:    message,
+			}
+			currID++
+			cbto.Req <- ReqMessage
+		}
+	}()
 
 	go func() {
-		cbto.Req <- ReqMessage
-		for{
+		for {
 			msg := <-cbto.Ind
 			fmt.Println("APP: CBTO: got a message! " + msg.Message)
 		}
@@ -81,7 +101,6 @@ func main() {
 	// 	MessageId:  1,
 	// 	Message:    "drones",
 	// }
-
 
 	// go func() {
 	// 	cbto2.Req <- ReqMessage2

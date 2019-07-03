@@ -59,24 +59,22 @@ func (module BestEffortBroadcast_Module) Start() {
 
 }
 
-
-
 func (module BestEffortBroadcast_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
-	fmt.Println(add + " --- BEB: got message: " + message.Message)
+	// fmt.Println(add + " --- BEB: got message: " + message.Message)
 	for i := 0; i < len(message.Addresses); i++ {
 		msg := BEB2PP2PLink(message)
 		msg.To = message.Addresses[i]
 		module.Pp2plink.Req <- msg
-		fmt.Println(add + " --- BEB: Sent to " + message.Addresses[i])
+		// fmt.Println(add + " --- BEB: Sent to " + message.Addresses[i])
 	}
 
 }
 
 func (module BestEffortBroadcast_Module) Deliver(message BestEffortBroadcast_Ind_Message) {
 
-	fmt.Println(add + " --- BEB: Deliver: Received '" + message.Message + "' from " + message.From)
+	// fmt.Println(add + " --- BEB: Deliver: Received '" + message.Message + "' from " + message.From)
 	module.Ind <- message
-	fmt.Println(add + " --- # End BEB Received")
+	// fmt.Println(add + " --- # End BEB Received")
 
 }
 
